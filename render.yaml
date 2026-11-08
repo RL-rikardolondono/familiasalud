@@ -1,0 +1,27 @@
+services:
+  - type: web
+    name: familiasalud-api
+    runtime: node
+    plan: free
+    region: ohio
+    rootDir: server
+    buildCommand: npm install
+    startCommand: node index.js
+    healthCheckPath: /api/ping
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: BREVO_API_KEY
+        sync: false
+      - key: FRONT_URL
+        value: https://familiasalud.skynetgenesis.com
+      - key: SUPERADMIN_CORREO
+        value: superadmin.familia@skynetgenesis.com
+      - key: BREVO_REMITENTE
+        value: familiasalud@skynetgenesis.com
+      - key: IPS_CORREO
+        value: contacto@reinaelizabeth.com
+      - key: DEMO
+        value: "true"
+      - key: PAGOS_BOLD
+        value: "0"
