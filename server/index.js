@@ -123,6 +123,8 @@ async function crearOrden(tipo, monto, datos, extra = {}) {
   await q(`INSERT INTO pagos(orden,tipo,claim,monto,comision,neto,estado,datos,prestador_id,familia_id,cita_id,plan) VALUES($1,$2,$3,$4,$5,$6,'pendiente',$7,$8,$9,$10,$11)`,
     [orden, tipo, claim, monto, extra.comision || 0, extra.neto || 0, datos || {}, extra.prestador || null, extra.familia || null, extra.cita || null, plan]);
   const base = { orden, claim, monto, descripcion: extra.desc || 'FamilIA Salud' };
+  // Oferta sin costo (ej. primer año gratis del Especialista Fundador): se aplica sin pasarela
+  if (monto === 0 && tipo === 'registro_medico') { await aplicarPago(orden, 'GRATIS'); return { ...base, gratis: true }; }
   if (DEMO_PAGOS || extra.demo) { await q('UPDATE pagos SET demo=true WHERE orden=$1', [orden]); return { ...base, demo: true }; }
   const f = await firmar(plan, orden, monto);
   await q('UPDATE pagos SET bold_ref=$2 WHERE orden=$1', [orden, f.orderId]);
@@ -225,7 +227,7 @@ async function aplicarPago(orden, boldId = null) {
         [pid, d.nombre, d.cedula, d.servicio, d.ciudad, d.sede, d.correo, d.celular, d.rethus, d.reps, d.mensaje, d.tarifa, d.particular, d.dias, d.horas, d.banco, /reina elizabeth/i.test(d.sede || ''), masAnio(H), !!d.fundador, d.doc, d.docTipo, d.docNombre, d.selfie, d.aceptacion || null]);
       await c.query(`UPDATE pagos SET estado='aprobado',prestador_id=$2,aprobado=now(),bold_id=$3,datos=$4 WHERE orden=$1`, [orden, pid, boldId, { correo: d.correo, nombre: d.nombre, ciudad: d.ciudad, fundador: !!d.fundador }]);
       if (d.solicitud) await c.query(`UPDATE solicitudes SET estado='registrado' WHERE id=$1`, [d.solicitud]);
-      aviso = () => enviarEnlace(d.correo, 'medico', 'crear').then(() => correo(d.correo, 'Recibimos su registro en FamilIA Salud', `<h2>Gracias, ${hx(d.nombre)}</h2><p>Recibimos su pago. Nuestro equipo está confirmando su registro profesional en el ReTHUS; le avisaremos apenas quede habilitado. En otro correo le enviamos el enlace para crear su contraseña.</p>`));
+      aviso = () => enviarEnlace(d.correo, 'medico', 'crear').then(() => correo(d.correo, 'Recibimos su registro en FamilIA Salud', `<h2>Gracias, ${hx(d.nombre)}</h2><p>Recibimos su registro. Nuestro equipo está confirmando su registro profesional en el ReTHUS; le avisaremos apenas quede habilitado. En otro correo le enviamos el enlace para crear su contraseña.</p>`));
     } else if (p.tipo === 'renovacion_medico') {
       const rows = (await c.query('SELECT id,vence FROM prestadores WHERE id = ANY($1)', [d.ids])).rows;
       for (const r of rows) await c.query('UPDATE prestadores SET vence=$2 WHERE id=$1', [r.id, masAnio(r.vence >= H ? r.vence : H)]);
@@ -695,7 +697,7 @@ app.post('/api/medicos/registro', h(async (req, res) => {
   const cuota = d.fundador ? a.cuotaFundador : a.cuotaMedico;
   if (req.body.acepto !== true) throw new Fallo('Debe aceptar las condiciones.');
   d.aceptacion = { version: '2026-11', fecha: new Date().toISOString(), ip: ipDe(req), nombre: d.nombre };
-  res.json(await crearOrden('registro_medico', cuota, d, { demo: DEMO && CORREOS_DEMO.includes(d.correo), fundador: d.fundador, desc: d.fundador ? 'Cuota primer año · Especialista Fundador' : 'Cuota anual de registro FamilIA Salud' }));
+  res.json(await crearOrden('registro_medico', cuota, d, { demo: DEMO && CORREOS_DEMO.includes(d.correo), fundador: d.fundador, desc: d.fundador ? (cuota === 0 ? 'Primer año gratis · Especialista Fundador' : 'Cuota primer año · Especialista Fundador') : 'Cuota anual de registro FamilIA Salud' }));
 }));
 async function cuenta(req) {
   const ps = await q('SELECT * FROM prestadores WHERE lower(correo)=$1 AND estado<>$2 ORDER BY institucion, servicio', [req.s.ref, 'rechazado']);
