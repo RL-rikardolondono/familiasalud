@@ -77,6 +77,7 @@ function cargarBold(){return new Promise((ok,mal)=>{if(window.BoldCheckout)retur
 async function iniciarPago(o){
   ui.ordenActual=o;
   try{localStorage.setItem('fs_orden',JSON.stringify({orden:o.orden,claim:o.claim,t:Date.now()}))}catch(e){}
+  if(o.gratis){esperarPago();return;}
   if(o.demo){
     modal(`<h3>Pago en línea</h3><p>${esc(o.descripcion)}</p><div class="precio-gr">${dinero(o.monto)}</div>
       <p class="suave" style="margin-top:.6rem">Puede pagar con tarjeta débito o crédito, PSE, Nequi y todos los medios de pago.</p>
@@ -114,7 +115,7 @@ async function esperarPago(){
 function pagoAprobado(r){
   cerrarModal();
   if(r.tipo==='afiliacion'){if(r.token)tok.set('familia',r.token);ui.nuevos=[];ui.vistaFam='carnets';ir('#/familia');toast('Pago aprobado. Los carnets de su familia ya están activos.');return}
-  if(r.tipo==='registro_medico'){if(r.token)tok.set('medico',r.token);ui.invitacion=null;ir('#/medico');toast('Pago recibido. Nuestro equipo está confirmando su ReTHUS.');return}
+  if(r.tipo==='registro_medico'){if(r.token)tok.set('medico',r.token);ui.invitacion=null;ir('#/medico');toast(r.monto===0?'Registro recibido. Su primer año es gratis; nuestro equipo está confirmando su ReTHUS.':'Pago recibido. Nuestro equipo está confirmando su ReTHUS.');return}
   if(r.tipo==='consulta'&&r.cita){const c=r.cita;
     modal(`<h3>Consulta confirmada</h3><p>${esc(c.miembro)} · ${esc(c.servicio)}<br>Profesional: <strong>${esc(c.nombre)}</strong><br>${c.inmediata?'<strong>Diríjase ahora mismo.</strong> El profesional ya fue avisado.':`${fmt(c.fecha)} a las ${hora12(c.hora)}`}<br>Dirección: ${esc(c.sede)}</p><p class="pequeno">Su código de atención. Entréguelo al profesional al terminar la consulta:</p><div class="cod-at">${esc(c.codigo)}</div><div class="fila" style="margin-top:1rem"><button class="btn btn-p" onclick="cerrarModal();ui.vistaFam='citas';ir('#/familia')">Ver mis consultas</button></div>`);return}
   toast('Pago aprobado.'); render();
@@ -267,7 +268,7 @@ async function vTerminos(){
   ${H('5. Profesionales e instituciones')}
   ${P('Ingreso.','Solo por invitación. Antes de publicar un perfil, una persona del equipo verifica el registro en el ReTHUS, la especialidad y la tarjeta profesional; SkyNet Genesis puede negar o retirar un perfil por datos falsos, quejas fundadas o incumplimiento.')}
   ${P('Independencia y responsabilidad.','Los profesionales son independientes: no son empleados ni contratistas de SkyNet Genesis. Responden por el diagnóstico, el tratamiento, la historia clínica, el consentimiento informado, sus permisos de funcionamiento y su facturación.')}
-  ${P('Cuota y comisión.',`La cuota anual es de ${dinero(a.cuotaMedico)} (los primeros ${a.cupoFundadores} especialistas de cada ciudad pagan ${dinero(a.cuotaFundador)} el primer año como Especialista Fundador). Por cada consulta atendida la plataforma descuenta el ${a.comision}% por servicios de plataforma. Al vencer la cuota anual, el perfil deja de recibir pacientes y luego se bloquea.`)}
+  ${P('Cuota y comisión.',`La cuota anual es de ${dinero(a.cuotaMedico)} (los primeros ${a.cupoFundadores} especialistas de cada ciudad ${a.cuotaFundador===0?'tienen el primer año gratis':'pagan '+dinero(a.cuotaFundador)+' el primer año'} como Especialista Fundador). Por cada consulta atendida la plataforma descuenta el ${a.comision}% por servicios de plataforma. Al vencer la cuota anual, el perfil deja de recibir pacientes y luego se bloquea.`)}
   ${P('Retiros.',`El valor de cada consulta atendida se puede retirar ${a.diasRetiro} días después de la atención, a la cuenta bancaria registrada a nombre del profesional o la institución.`)}
   ${P('Trato directo.','Los pacientes conseguidos por la plataforma se atienden y cobran a través de ella mientras el perfil esté activo. Desviar pagos fuera de la plataforma permite retirar el perfil.')}
   ${H('6. Responsabilidad de SkyNet Genesis')}
@@ -537,7 +538,7 @@ async function vEspecialistas(){
     <div><h3>Pago asegurado</h3><p class="pequeno">El paciente paga al reservar. Al registrar su código de atención, el dinero pasa a su saldo.</p></div>
     <div><h3>Botón "Disponible ahora"</h3><p class="pequeno">Actívelo cuando tenga un espacio libre y reciba pacientes que necesitan atención inmediata.</p></div>
     <div><h3>Dos precios</h3><p class="pequeno">Usted escribe su precio real y su precio con descuento para afiliados. La aplicación cobra ${a.comision}% del precio con descuento por sus servicios.</p></div>
-    <div><h3>Cuota anual</h3><p class="pequeno">Especialista Fundador: ${dinero(a.cuotaFundador)} el primer año para los primeros ${a.cupoFundadores} de cada ciudad (precio normal ${dinero(a.cuotaMedico)}).</p></div>
+    <div><h3>Cuota anual</h3><p class="pequeno">Especialista Fundador: primer año ${(a.cuotaFundador===0?'gratis':dinero(a.cuotaFundador))} para los primeros ${a.cupoFundadores} de cada ciudad (precio normal ${dinero(a.cuotaMedico)}).</p></div>
     <div><h3>Red verificada</h3><p class="pequeno">Una persona de nuestro equipo confirma en el ReTHUS su especialidad. Por eso las familias confían en la red.</p></div></div>
   <section class="recordatorio" id="ofertaFund"></section>
   ${inv?'':`<div class="rejilla" id="acceso" style="align-items:start">
@@ -589,10 +590,10 @@ async function usarCodigo(){
 }
 function ofertaCiudad(){
   const c=(document.getElementById('rCiu')||{}).value||(ui.invitacion||{}).ciudad; const of=document.getElementById('ofertaFund'); if(!c){if(of)of.style.display='none';return} if(of)of.style.display=''; const a=CFG.ajustes, q=Math.max(0,a.cupoFundadores-(CFG.fundadores[c]||0)), cuota=q>0?a.cuotaFundador:a.cuotaMedico;
-  document.getElementById('ofertaFund').innerHTML=q>0?`<strong>Oferta Especialista Fundador en ${c}:</strong> los primeros ${a.cupoFundadores} especialistas de cada ciudad pagan ${dinero(a.cuotaFundador)} el primer año en lugar de ${dinero(a.cuotaMedico)}. En ${c} quedan <strong>${q}</strong> cupos.`:`Los cupos de Especialista Fundador en ${c} ya se agotaron. La cuota anual es ${dinero(a.cuotaMedico)}.`;
+  document.getElementById('ofertaFund').innerHTML=q>0?`<strong>Oferta Especialista Fundador en ${c}:</strong> los primeros ${a.cupoFundadores} especialistas de cada ciudad ${a.cuotaFundador===0?'usan la plataforma <strong>el primer año gratis</strong> (después, '+dinero(a.cuotaMedico)+' al año)':'pagan '+dinero(a.cuotaFundador)+' el primer año en lugar de '+dinero(a.cuotaMedico)}. En ${c} quedan <strong>${q}</strong> cupos.`:`Los cupos de Especialista Fundador en ${c} ya se agotaron. La cuota anual es ${dinero(a.cuotaMedico)}.`;
   const bt=document.getElementById('btnRegistro'), ta=document.getElementById('txtAcep'); if(!bt||!ta) return;
-  bt.textContent=`Pagar ${dinero(cuota)} y enviar registro`;
-  ta.textContent=`Acepto pagar la cuota del primer año de ${dinero(cuota)} (desde el segundo año, ${dinero(a.cuotaMedico)}) y que FamilIA Salud recaude mis consultas y me transfiera el ${100-a.comision}% al registrar la atención. Acepto los términos y el tratamiento de mis datos personales.`;
+  bt.textContent=cuota===0?'Enviar registro (primer año gratis)':`Pagar ${dinero(cuota)} y enviar registro`;
+  ta.textContent=`${cuota===0?'Entiendo que mi primer año es gratis y que desde el segundo año la cuota es de '+dinero(a.cuotaMedico):'Acepto pagar la cuota del primer año de '+dinero(cuota)+' (desde el segundo año, '+dinero(a.cuotaMedico)+')'} y que FamilIA Salud recaude mis consultas y me transfiera el ${100-a.comision}% al registrar la atención. Acepto los términos y el tratamiento de mis datos personales.`;
 }
 const leerArchivo=f=>new Promise((ok,mal)=>{const l=new FileReader();l.onload=()=>ok(l.result);l.onerror=()=>mal(new Error('No se pudo leer el archivo.'));l.readAsDataURL(f)});
 async function registrarEspecialista(){
