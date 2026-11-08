@@ -24,4 +24,4 @@ services:
       - key: DEMO
         value: "true"
       - key: PAGOS_BOLD
-        value: "0"
+        value: "1"
