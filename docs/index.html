@@ -54,6 +54,7 @@ main{max-width:1040px;margin:0 auto;padding:1.2rem 1rem 3rem}
 .btn-p{background:var(--petroleo);color:#fff} .btn-a{background:var(--ambar);color:#fff} .btn-wa{background:var(--wa);color:#fff}
 .btn-l{background:#fff;color:var(--petroleo);border:1.5px solid var(--linea)} .btn-r{background:var(--rojo);color:#fff}
 .btn-chico{padding:.4rem .75rem;min-height:36px;font-size:.9rem}
+@media(max-width:380px){.barra-acc .btn-chico{padding:.35rem .5rem;font-size:.8rem}.barra-in .marca span{font-size:1.05rem}}
 .btn[disabled]{opacity:.5;cursor:not-allowed}
 
 label{display:block;font-weight:600;font-size:.9rem;margin:.6rem 0 .25rem}
@@ -162,7 +163,7 @@ details summary{list-style:revert}
 </head>
 <body>
 <header class="barra">
-  <div class="barra-in"><a class="marca" href="#/" id="marca"></a><a class="btn btn-a btn-chico" href="#/activar">Activar carnet</a></div>
+  <div class="barra-in"><a class="marca" href="#/" id="marca"></a><div class="barra-acc" style="display:flex;gap:.45rem;flex-wrap:nowrap"><a class="btn btn-l btn-chico" href="#/ingresar">Ingresar</a><a class="btn btn-a btn-chico" href="#/activar">Activar carnet</a></div></div>
   <nav class="nav" id="nav"></nav>
 </header>
 <main id="app"></main>

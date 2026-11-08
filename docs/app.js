@@ -156,7 +156,7 @@ async function render(){
   const app=document.getElementById('app');
   const lento=setTimeout(()=>{if(app.dataset.cargando)app.innerHTML='<div class="panel">Despertando el servidor… la primera visita del día puede tardar hasta un minuto.</div>'},3500);
   app.dataset.cargando='1'; if(!app.innerHTML.trim()) app.innerHTML='<div class="panel">Cargando…</div>';
-  const vistas={'':vInicio,ciudades:vCiudades,ciudad:()=>vCiudad(r.a),activar:vActivar,especialistas:vEspecialistas,familia:vFamilia,medico:vMedico,admin:vAdmin,terminos:vTerminos,verificar:()=>vVerificar(location.hash.split('/')[2]||'',location.hash.split('/')[3]||''),clave:()=>vClave(r.a,(location.hash.split('/')[3]||''))};
+  const vistas={'':vInicio,ciudades:vCiudades,ciudad:()=>vCiudad(r.a),activar:vActivar,especialistas:vEspecialistas,familia:vFamilia,medico:vMedico,admin:vAdmin,terminos:vTerminos,ingresar:vIngresar,verificar:()=>vVerificar(location.hash.split('/')[2]||'',location.hash.split('/')[3]||''),clave:()=>vClave(r.a,(location.hash.split('/')[3]||''))};
   let html; try{await config();html=await (vistas[r.p]||vInicio)()}catch(e){html=`<div class="panel"><h3>No se pudo cargar</h3><p>${esc(e.message)}</p><button class="btn btn-p" onclick="render()">Reintentar</button></div>`}
   clearTimeout(lento); delete app.dataset.cargando;
   app.innerHTML=html;
@@ -226,6 +226,17 @@ async function abrirManual(tipo,m){
 const barraCuenta=(tipo,quien,perfil)=>`<div class="fila cuenta-barra" style="justify-content:space-between;margin-bottom:.8rem"><div><span class="pequeno suave">Usted está en: <strong>${perfil}</strong></span><h2 style="margin:0">${esc(quien)}</h2></div><div class="fila"><button class="btn btn-l btn-chico" onclick="abrirManual('${tipo}','mio')">📘 Mi manual</button><button class="btn btn-l btn-chico" onclick="miCuenta('${tipo}')">Mi cuenta</button><button class="btn btn-l btn-chico" onclick="salir('${tipo}')">Cerrar sesión</button></div></div>`;
 
 /* ---------- Términos y tratamiento de datos ---------- */
+function vIngresar(){
+  const c=(ic,t,d,h,b,cl)=>`<a class="panel" href="${h}" style="display:block;text-decoration:none;color:inherit"><div style="font-size:2rem">${ic}</div><h3 style="margin:.3rem 0">${t}</h3><p class="suave">${d}</p><span class="btn ${cl}">${b}</span></a>`;
+  return `<section class="panel"><h2>¿Cómo quiere ingresar?</h2><p class="suave">Elija su tipo de cuenta. Todas entran con correo y contraseña; si es la primera vez, use «Primera vez u olvidó su contraseña».</p></section>
+  <div class="rejilla">
+    ${c('👨‍👩‍👧','Mi familia','Para las familias con carnet: ver el carnet, pedir y pagar consultas, saldo a favor.','#/familia','Ingresar como familia','btn-a')}
+    ${c('🩺','Portal médico','Para especialistas y la sede propia: agenda, consultas, precios y retiros.','#/medico','Ingresar como profesional','btn-p')}
+    ${c('🔐','Equipo FamilIA Salud','Superadministrador, verificación, contabilidad y operación (SkyNet Genesis).','#/admin','Acceso del equipo','btn-l')}
+  </div>
+  <p class="pequeno suave" style="margin-top:1rem">¿Aún no tiene cuenta? <a href="#/activar">Active el carnet de su familia</a> o <a href="#/especialistas">únase como especialista</a>.</p>
+  <div class="fila" style="margin-top:.6rem"><a class="btn btn-l" href="#/">← Volver</a></div>`;
+}
 async function vTerminos(){
   const a=CFG.ajustes;
   return `<section class="panel"><p><a class="btn btn-l btn-chico" href="javascript:history.back()">← Volver</a></p><h2>Términos y condiciones</h2>
