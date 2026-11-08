@@ -13,6 +13,7 @@ const ICO={reloj:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',precio
  chat:'<path d="M4 5h16v11H9l-5 4z"/>',recibo:'<path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/>',corazon:'<path d="M12 20s-7-4.5-7-10a4 4 0 017-2.5A4 4 0 0119 10c0 5.5-7 10-7 10z"/>',
  agenda:'<rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 9h16M9 3v4M15 3v4"/>',dinero:'<rect x="3" y="6" width="18" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/>',rayo:'<path d="M13 3L5 14h6l-1 7 8-11h-6z"/>',perfil:'<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/>'};
 const ico=k=>`<span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true">${ICO[k]}</svg></span>`;
+const FOTO_HERO=`<img class="foto-hero" src="https://images.pexels.com/photos/32423069/pexels-photo-32423069.jpeg?auto=compress&cs=tinysrgb&w=900&h=680&fit=crop" alt="Familia feliz disfrutando un día soleado en el parque" loading="eager" onerror="this.style.display='none'">`;
 const ILUSTRACION=`<svg class="ilustra" viewBox="0 0 400 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Familia feliz y protegida">
 <circle cx="200" cy="165" r="145" fill="#fff" opacity=".10"/><circle cx="200" cy="165" r="108" fill="#fff" opacity=".10"/>
 <path d="M200 34l66 25v49c0 46-30 76-66 92-36-16-66-46-66-92V59z" fill="#fff"/><path d="M190 84h20v24h24v20h-24v24h-20v-24h-24v-20h24z" fill="#14A38B"/>
@@ -309,7 +310,7 @@ async function vInicio(){
     <div class="espera"><div class="eps"><span class="pequeno">Con su EPS</span><strong>Meses de espera</strong></div><div class="fs"><span class="pequeno">Con su carnet FamilIA Salud</span><strong>Ahora mismo</strong></div></div>
     <div class="fila"><a class="btn btn-a" href="#/activar">Activar el carnet de mi familia</a><a class="btn btn-l" href="#/ciudades">Ver especialistas</a></div>
     <p class="pequeno" style="margin-top:.8rem;color:#E3EEF9">${n} especialidades y servicios disponibles para usted.</p></div>
-    ${ILUSTRACION}</section>
+    ${FOTO_HERO}</section>
   ${ventajasFamilia()}
   <section class="panel"><h2>Afiliación anual de toda la familia</h2>
     <div class="precio-plan"><span class="precio-gr">${dinero(p.enLinea)}</span><span class="tachado">${dinero(p.regular)}</span><span class="etq etq-ok">Ahorra ${dinero(p.ahorro)} activando usted mismo en línea</span></div>
