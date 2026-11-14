@@ -1,6 +1,6 @@
 // Catálogo de especialidades y subespecialidades (agrupado)
 export const CATALOGO = [
-  { g: 'Atención inmediata y medicina general', e: ['Medicina general', 'Medicina general a domicilio', 'Medicina familiar'] },
+  { g: 'Atención inmediata y medicina general', e: ['Medicina general', 'Medicina general a domicilio', 'Medicina familiar', 'Atención médica en VIH'] },
   { g: 'Pediatría y subespecialidades', e: ['Pediatría', 'Neonatología', 'Neuropediatría', 'Cardiología pediátrica', 'Gastroenterología pediátrica', 'Neumología pediátrica', 'Endocrinología pediátrica', 'Nefrología pediátrica', 'Infectología pediátrica', 'Alergología pediátrica', 'Hemato-oncología pediátrica', 'Cirugía pediátrica', 'Ortopedia infantil'] },
   { g: 'Medicina interna y subespecialidades', e: ['Medicina interna', 'Cardiología', 'Electrofisiología', 'Gastroenterología', 'Hepatología', 'Endocrinología', 'Nefrología', 'Neumología', 'Reumatología', 'Hematología', 'Oncología clínica', 'Infectología', 'Geriatría', 'Alergología', 'Inmunología clínica'] },
   { g: 'Salud de la mujer', e: ['Ginecología y obstetricia', 'Medicina materno-fetal', 'Ginecología oncológica', 'Fertilidad y reproducción', 'Uroginecología', 'Mastología'] },
