@@ -59,7 +59,14 @@ function estadoMedico(vence) {
   if (d < 10) return { k: 'aviso', dias: 10 - d, txt: `Vencida: visible sin pacientes · ${10 - d} día${10 - d === 1 ? '' : 's'} para bloqueo` };
   return { k: 'bloqueado', txt: 'Bloqueada por pago' };
 }
-const ahoraVigente = p => !!p.ahora && (p.urgencias || p.institucion || !p.ahora_desde || (Date.now() - new Date(p.ahora_desde).getTime()) < 3 * 3600e3);
+// Una sede o institucion solo esta "disponible ahora" dentro de su horario (dias y desde el primer turno hasta una hora despues del ultimo)
+const enHorario = p => {
+  const A = ahoraBog(); if (!(p.dias || []).map(Number).includes(diaSemana(A.fecha))) return false;
+  const hs = (p.horas || []).filter(x => /^\d{2}:\d{2}$/.test(x)).sort(); if (!hs.length) return false;
+  const ult = hs[hs.length - 1], fin = String(Number(ult.slice(0, 2)) + 1).padStart(2, '0') + ult.slice(2);
+  return A.hora >= hs[0] && A.hora < fin;
+};
+const ahoraVigente = p => !!p.ahora && (p.urgencias || (p.institucion ? enHorario(p) : (!p.ahora_desde || (Date.now() - new Date(p.ahora_desde).getTime()) < 3 * 3600e3)));
 const puedeRecibir = p => p.estado === 'aprobado' && (p.institucion || estadoMedico(p.vence).k === 'activo');
 const visible = p => p.estado === 'aprobado' && (p.institucion || estadoMedico(p.vence).k !== 'bloqueado');
 const VIS_SQL = `estado='aprobado' AND demo=false`;
@@ -658,6 +665,27 @@ app.post('/api/familia/resena', requiere('familia'), h(async (req, res) => {
 }));
 
 /* ----- Especialistas ----- */
+app.post('/api/familia/pedir-especialista', requiere('familia'), h(async (req, res) => {
+  const f = await q1('SELECT * FROM familias WHERE id=$1', [req.s.ref]);
+  if (estadoVigencia(f.vence).k === 'cerrada') throw new Fallo('Su carnet está vencido. Renuévelo para pedir un especialista.');
+  const servicio = req.body.servicio; if (!ESPECIALIDADES.includes(servicio)) throw new Fallo('Elija la especialidad de la lista.');
+  const miembros = await q('SELECT nombre FROM miembros WHERE familia_id=$1 ORDER BY orden', [f.id]);
+  const m = miembros[Number(req.body.miembro)]; if (!m) throw new Fallo('Elija para quién es la consulta.');
+  const n = await q1(`SELECT count(*)::int n FROM pedidos_esp WHERE familia_id=$1 AND creado>now()-interval '1 day'`, [f.id]);
+  if (n.n >= 5) throw new Fallo('Ya recibimos varios pedidos suyos hoy. Le escribiremos pronto.');
+  const nota = limpio(req.body.nota, 300);
+  await q(`INSERT INTO pedidos_esp(id,familia_id,ciudad,servicio,miembro,nota,demo) VALUES($1,$2,$3,$4,$5,$6,$7)`, [uid('pe'), f.id, f.ciudad, servicio, m.nombre, nota, !!f.demo]);
+  if (!f.demo && E.ADMIN_CORREO) correo(E.ADMIN_CORREO, 'Una familia pide un especialista · FamilIA Salud', `<p><b>${hx(servicio)}</b> en ${hx(f.ciudad)} para ${hx(m.nombre)}.</p><p>${hx(nota)}</p><p>Búsquelo e invítelo a la red. Los datos de la familia están en <a href="${FRONT}/#/admin">Administración → Solicitudes</a>.</p>`);
+  if (!f.demo) correo(f.correo, 'Recibimos su pedido · FamilIA Salud', `<p>Recibimos su pedido de <b>${hx(servicio)}</b> para ${hx(m.nombre)}. Vamos a buscar al especialista y le escribimos o llamamos en cuanto lo tengamos.</p>`);
+  res.json({ ok: true });
+}));
+app.post('/api/admin/pedido-esp', requiere('admin'), h(async (req, res) => {
+  exige(req, 'verificar');
+  const est = ['nuevo', 'buscando', 'conseguido', 'no_conseguido'].includes(req.body.estado) ? req.body.estado : null;
+  if (!est) throw new Fallo('Estado no válido.');
+  await q('UPDATE pedidos_esp SET estado=$2 WHERE id=$1', [req.body.id, est]);
+  res.json({ ok: true });
+}));
 app.post('/api/medicos/solicitud', h(async (req, res) => {
   const b = req.body, d = { nombre: limpio(b.nombre, 120), servicio: b.servicio, ciudad: b.ciudad, rethus: limpio(b.rethus, 40), correo: limpio(b.correo, 120).toLowerCase(), celular: limpio(b.celular, 30) };
   if (!d.nombre || !d.rethus || !correoOk(d.correo) || !d.celular) throw new Fallo('Complete todos los datos de la solicitud.');
@@ -836,6 +864,7 @@ app.get('/api/admin/datos', requiere('admin'), h(async (req, res) => {
   const activas = familias.filter(f => f.estado.k !== 'cerrada');
   const out = { yo: req.s.ref, rol: req.s.rol, permisos: pm, ajustes: a, familias, pendientes, red,
     kpis: { familias: activas.length, personas: activas.reduce((s, f) => s + f.personas, 0), especialistas: red.filter(p => p.vigencia.k !== 'bloqueado').length } };
+  if (pm.verificar) out.pedidosEsp = await q(`SELECT pe.id,pe.ciudad,pe.servicio,pe.miembro,pe.nota,pe.estado,to_char(pe.creado AT TIME ZONE 'America/Bogota','YYYY-MM-DD HH24:MI') fecha,f.titular,f.telefono,f.correo FROM pedidos_esp pe JOIN familias f ON f.id=pe.familia_id WHERE pe.demo=false ORDER BY (pe.estado IN ('nuevo','buscando')) DESC, pe.creado DESC LIMIT 200`);
   if (pm.verificar) out.solicitudes = await q(`SELECT id,nombre,servicio,ciudad,rethus,correo,celular,estado,codigo,to_char(creado AT TIME ZONE 'America/Bogota','YYYY-MM-DD') fecha FROM solicitudes ORDER BY creado DESC LIMIT 200`);
   const fund = {}; ps.filter(p => p.fundador).forEach(p => fund[p.ciudad] = (fund[p.ciudad] || 0) + 1); out.fundadores = fund;
   if (pm.dinero) {
@@ -1027,6 +1056,7 @@ ALTER TABLE prestadores ADD COLUMN IF NOT EXISTS cancelaciones int DEFAULT 0;
 CREATE TABLE IF NOT EXISTS bloqueos (id text PRIMARY KEY, correo text, desde text, hasta text, motivo text, creado timestamptz DEFAULT now());
 CREATE TABLE IF NOT EXISTS saldo_mov (id text PRIMARY KEY, familia_id text, monto int, concepto text, creado timestamptz DEFAULT now());
 CREATE TABLE IF NOT EXISTS devoluciones (id text PRIMARY KEY, familia_id text, monto int, cuenta text, estado text DEFAULT 'solicitada', creado timestamptz DEFAULT now());
+CREATE TABLE IF NOT EXISTS pedidos_esp (id text PRIMARY KEY, familia_id text, ciudad text, servicio text, miembro text, nota text, estado text DEFAULT 'nuevo', demo boolean DEFAULT false, creado timestamptz DEFAULT now());
 CREATE TABLE IF NOT EXISTS espera (correo text, ciudad text, nombre text, celular text, avisado boolean DEFAULT false, creado timestamptz DEFAULT now(), PRIMARY KEY(correo, ciudad));
 CREATE TABLE IF NOT EXISTS avisos (clave text PRIMARY KEY, creado timestamptz DEFAULT now());
 CREATE TABLE IF NOT EXISTS pagos (orden text PRIMARY KEY, tipo text, claim text, monto int, comision int DEFAULT 0, neto int DEFAULT 0, estado text, datos jsonb, prestador_id text, familia_id text, cita_id text, bold_id text, creado timestamptz DEFAULT now(), aprobado timestamptz, liberado timestamptz);
@@ -1133,7 +1163,7 @@ async function limpiar() {
     if (DEMO) {
       await q(`DELETE FROM citas WHERE demo AND creado<now()-interval '1 day'`);
       await q(`DELETE FROM pagos WHERE demo AND creado<now()-interval '1 day'`);
-      await q(`UPDATE prestadores SET ahora=true, ahora_desde=NULL, tarifa=90000, particular=135000, mensaje='Acompaño a su hijo desde el primer día con paciencia y explicaciones claras.' WHERE id='ddemo'`);
+      await q(`UPDATE prestadores SET ahora=true, ahora_desde=NULL, propio=false, sede='Consultorio 3, Edificio Médico Central (demostración)', tarifa=90000, particular=135000, mensaje='Acompaño a su hijo desde el primer día con paciencia y explicaciones claras.' WHERE id='ddemo'`);
       const hd = await hashClave(CLAVE_DEMO);
       await q(`UPDATE cuentas SET hash=$1, bloqueada=false WHERE correo=ANY($2)`, [hd, CORREOS_DEMO]);
     }
