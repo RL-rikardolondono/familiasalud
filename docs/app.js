@@ -47,7 +47,7 @@ const dinero=n=>(n<0?'−$':'$')+Math.abs(Math.round(Number(n)||0)).toLocaleStri
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const DIAS=['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
 const MESES=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
-const hora12=h=>{const [a,b]=String(h).split(':').map(Number);return `${((a+11)%12)+1}:${pad(b)} ${a<12?'a. m.':'p. m.'}`};
+const hora12=h=>{const [a,b]=String(h).split(':').map(Number);return `${((a+11)%12)+1}:${pad(b)}\u00a0${a<12?'a.\u00a0m.':'p.\u00a0m.'}`};
 const slug=s=>s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,'-');
 const estrellas=n=>'★★★★★'.slice(0,Math.round(n))+'☆☆☆☆☆'.slice(0,5-Math.round(n));
 const tok={get:t=>{try{return localStorage.getItem('fs_tok_'+t)}catch(e){return null}},set:(t,v)=>{try{v?localStorage.setItem('fs_tok_'+t,v):localStorage.removeItem('fs_tok_'+t)}catch(e){}}};
@@ -157,7 +157,13 @@ async function render(){
   const bAcc=document.querySelector('.barra-acc'); if(bAcc){const se=tok.get('familia')?['familia','Mi familia']:tok.get('medico')?['medico','Portal médico']:tok.get('admin')?['admin','Administración']:null; bAcc.innerHTML=se?`<a class="btn btn-a btn-chico" href="#/${se[0]}">${se[1]}</a>`:'<a class="btn btn-l btn-chico" href="#/ingresar">Ingresar</a><a class="btn btn-a btn-chico" href="#/activar">Activar carnet</a>'}
   const act=document.querySelector('#nav a[aria-current="page"]'); if(act&&act.scrollIntoView) act.scrollIntoView({block:'nearest',inline:'center'});
   const app=document.getElementById('app');
-  const lento=setTimeout(()=>{if(app.dataset.cargando)app.innerHTML='<div class="panel">Despertando el servidor… la primera visita del día puede tardar hasta un minuto.</div>'},3500);
+  const lento=setTimeout(()=>{if(!app.dataset.cargando)return;
+    // Pantalla de espera oficial de SkyNet Genesis mientras el servidor se prepara (una vez cada 10 minutos)
+    let ya=0;try{ya=Number(sessionStorage.getItem('fsEspera')||0)}catch(e){}
+    if(Date.now()-ya>600e3&&/familiasalud\.skynetgenesis\.com$/.test(location.hostname)){try{sessionStorage.setItem('fsEspera',String(Date.now()))}catch(e){}
+      const q=new URLSearchParams(location.search),p=new URLSearchParams({app:'familia-salud'});q.forEach((v,k)=>{if(/^bold-/.test(k))p.set(k,v)});
+      location.replace('https://skynetgenesis.com/abrir.html?'+p.toString()+location.hash);return}
+    app.innerHTML='<div class="panel">Estamos preparando FamilIA Salud. Preparamos un espacio seguro, solo para usted…</div>'},3500);
   app.dataset.cargando='1'; if(!app.innerHTML.trim()) app.innerHTML='<div class="panel">Cargando…</div>';
   const vistas={'':vInicio,ciudades:vCiudades,ciudad:()=>vCiudad(r.a),activar:vActivar,especialistas:vEspecialistas,familia:vFamilia,medico:vMedico,admin:vAdmin,terminos:vTerminos,ingresar:vIngresar,verificar:()=>vVerificar(location.hash.split('/')[2]||'',location.hash.split('/')[3]||''),clave:()=>vClave(r.a,(location.hash.split('/')[3]||''))};
   let html; try{await config();html=await (vistas[r.p]||vInicio)()}catch(e){html=`<div class="panel"><h3>No se pudo cargar</h3><p>${esc(e.message)}</p><button class="btn btn-p" onclick="render()">Reintentar</button></div>`}
@@ -445,7 +451,7 @@ async function vFamilia(){
   if(st.k==='aviso') h+=`<section class="aviso fila" style="justify-content:space-between"><div style="flex:1;min-width:220px"><h3>Su carnet venció el ${fmt(f.vence)}</h3><p class="pequeno">Si no renueva, el acceso se suspende en ${st.dias} día${st.dias===1?'':'s'}.</p><div class="fila"><button class="btn btn-a" onclick="renovarFamilia()">Renovar por ${dinero(y.renovacion)}</button>${ayuda}</div></div><div style="text-align:center"><div class="cuenta">${st.dias}</div><div class="pequeno">días</div></div></section>`;
   else if(st.porVencer!=null) h+=`<section class="recordatorio fila" style="justify-content:space-between"><span>${st.porVencer===0?'Su carnet vence HOY.':`Su carnet vence en ${st.porVencer} día${st.porVencer===1?'':'s'}.`} Renueve sin perder días.</span><button class="btn btn-a btn-chico" onclick="renovarFamilia()">Renovar</button></section>`;
   h+=`${barraCuenta('familia',f.titular,'Mi familia')}<p class="suave pequeno" style="margin-top:-.6rem">${y.miembros.length} persona${y.miembros.length>1?'s':''} · ${esc(f.ciudad)} · vigente hasta ${fmt(f.vence)}</p>
-  <section class="panel" style="border-left:5px solid var(--wa)"><div class="fila" style="justify-content:space-between"><div><h3 style="margin:0">${(CFG.especialidades||{})[f.ciudad]||0} especialidades y servicios disponibles para usted en ${esc(f.ciudad)}</h3><span class="pequeno suave">${y.ahora.slice(0,6).map(esc).join(' · ')}</span></div><a class="btn btn-a" href="#/ciudad/${slug(f.ciudad)}">Ser atendido ahora</a></div></section>
+  <section class="panel" style="border-left:5px solid var(--wa)"><div class="fila" style="justify-content:space-between"><div><h3 style="margin:0">${(CFG.especialidades||{})[f.ciudad]||0} especialidades y servicios disponibles para usted en ${esc(f.ciudad)}</h3><span class="pequeno suave">${y.ahora.slice(0,6).map(esc).join(' · ')}</span></div><a class="btn btn-a" href="#/ciudad/${slug(f.ciudad)}">${y.ahora.length?'Ser atendido ahora':'Ver turnos disponibles'}</a></div></section>
   <div class="sub">${[['carnets','Carnets'],['citas','Mis consultas'],['pagos','Mis pagos y saldo'],['grupo','Grupo familiar']].map(([k,t])=>`<button aria-pressed="${ui.vistaFam===k}" onclick="ui.vistaFam='${k}';render()">${t}</button>`).join('')}<button onclick="ir('#/ciudad/${slug(f.ciudad)}')">Buscar especialista</button></div>`;
   if(y.familia.saldo>0&&ui.vistaFam!=='pagos') h+=`<p class="recordatorio pequeno">Tiene <strong>${dinero(y.familia.saldo)}</strong> de saldo a favor para su próxima consulta. <a href="javascript:void 0" onclick="ui.vistaFam='pagos';render()">Ver o pedir devolución</a></p>`;
   if(ui.vistaFam==='grupo') h+=vGrupo(y);
