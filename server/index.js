@@ -47,16 +47,16 @@ const hx = t => String(t ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '
 function estadoVigencia(vence) {
   const h = hoy();
   if (vence >= h) { const r = diasEntre(h, vence); return { k: 'activa', txt: 'Activa', porVencer: r <= 15 ? r : null }; }
+  // Regla de todas las apps de SkyNet Genesis: aviso los 5 días siguientes al vencimiento y bloqueo al terminar el día 5
   const d = diasEntre(vence, h);
-  if (d < 5) return { k: 'activa', txt: 'Activa (gracia)', gracia: true };
-  if (d < 10) return { k: 'aviso', dias: 10 - d, txt: `Aviso: ${10 - d} día${10 - d === 1 ? '' : 's'}` };
+  if (d <= 5) return { k: 'aviso', dias: 6 - d, txt: `Aviso: ${6 - d} día${6 - d === 1 ? '' : 's'}` };
   return { k: 'cerrada', txt: 'Cerrada por pago' };
 }
 function estadoMedico(vence) {
   const h = hoy();
   if (vence >= h) { const r = diasEntre(h, vence); return { k: 'activo', txt: 'Activa', porVencer: r <= 15 ? r : null }; }
   const d = diasEntre(vence, h);
-  if (d < 10) return { k: 'aviso', dias: 10 - d, txt: `Vencida: visible sin pacientes · ${10 - d} día${10 - d === 1 ? '' : 's'} para bloqueo` };
+  if (d <= 5) return { k: 'aviso', dias: 6 - d, txt: `Vencida: visible sin pacientes · ${6 - d} día${6 - d === 1 ? '' : 's'} para bloqueo` };
   return { k: 'bloqueado', txt: 'Bloqueada por pago' };
 }
 // Una sede o institucion solo esta "disponible ahora" dentro de su horario (dias y desde el primer turno hasta una hora despues del ultimo)
@@ -295,6 +295,8 @@ app.use((req, res, next) => {
   next();
 });
 
+// Pantalla de espera de SkyNet Genesis (skynetgenesis.com/abrir.html) consulta aquí si el servidor ya despertó
+app.get('/health', (req, res) => { res.set('Access-Control-Allow-Origin', '*'); res.set('Cache-Control', 'no-store'); res.json({ ok: true, app: 'familia-salud' }); });
 app.use(express.json({ limit: '6mb' }));
 // El receptor central de skynetgenesis.com avisa aquí; se confirma consultando el verificador central
 app.post('/api/bold/aplicar', async (req, res) => {
@@ -343,7 +345,7 @@ app.post('/api/auth/entrar', h(async (req, res) => {
   if (c && c.bloqueada) throw new Fallo('Esta cuenta está bloqueada. Escríbanos por WhatsApp al 304 437 5758.', 403);
   if (!okClave) {
     const quedan = 5 - k1.r.n;
-    throw new Fallo(quedan > 0 && quedan <= 2 ? `El correo o la contraseña no son correctos. Le quedan ${quedan} intento${quedan === 1 ? '' : 's'} antes de esperar 15 minutos.` : quedan <= 0 ? 'Demasiados intentos. Espere 15 minutos e intente de nuevo.' : 'El correo o la contraseña no son correctos. Si es su primera vez, toque "Primera vez u olvidó su contraseña".', 401);
+    throw new Fallo(quedan > 0 && quedan <= 2 ? `El correo o la contraseña no son correctos. ${quedan === 1 ? 'Le queda 1 intento' : `Le quedan ${quedan} intentos`} antes de esperar 15 minutos.` : quedan <= 0 ? 'Demasiados intentos. Espere 15 minutos e intente de nuevo.' : 'El correo o la contraseña no son correctos. Si es su primera vez, toque "Primera vez u olvidó su contraseña".', 401);
   }
   INTENTOS.delete(`${tipo}|${correoU}|${ipDe(req)}`);
   await q('UPDATE cuentas SET intentos=0, bloqueo=NULL, ultimo=now() WHERE correo=$1 AND tipo=$2', [correoU, tipo]);
