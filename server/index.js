@@ -1162,6 +1162,9 @@ async function limpiar() {
     await q(`DELETE FROM enlaces WHERE expira<now()-interval '1 day'`);
     await q(`UPDATE citas SET estado='abandonada' WHERE estado='pendiente_pago' AND creado<now()-interval '1 day'`);
     await q(`UPDATE pagos SET estado='abandonado', datos='{}'::jsonb WHERE estado='pendiente' AND creado<now()-interval '3 days'`);
+    // Restos de las Prueba Ácida en producción (correo de prueba de SkyNet Genesis): se borran solos
+    await q(`DELETE FROM solicitudes WHERE lower(correo)='pruebaacida@skynetgenesis.com' AND estado IN ('pendiente','rechazada')`);
+    await q(`DELETE FROM pagos WHERE estado IN ('pendiente','abandonado') AND familia_id IS NULL AND lower(datos->>'correo')='pruebaacida@skynetgenesis.com'`);
     if (DEMO) {
       await q(`DELETE FROM citas WHERE demo AND creado<now()-interval '1 day'`);
       await q(`DELETE FROM pagos WHERE demo AND creado<now()-interval '1 day'`);
