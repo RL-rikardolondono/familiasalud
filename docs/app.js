@@ -345,7 +345,7 @@ async function vCiudad(s){
   const d=await api('/api/publico/ciudad/'+encodeURIComponent(c),{auth:'familia'}); ui.datosCiudad=d;
   const lista=d.prestadores, fam=d.familia;
   let h=`<h1 style="font-size:clamp(2rem,6vw,3rem)">Especialistas en ${c}</h1>`;
-  if(!d.abierta) h+=`<section class="panel" style="border-left:5px solid var(--acento)"><h2 style="margin-top:0">Próximamente en ${c}</h2><p>Estamos reuniendo especialistas en ${c}. Le avisamos por correo el día que pueda activar el carnet de su familia aquí.</p><div class="r2"><div><label for="eNom">Nombre</label><input id="eNom"></div><div><label for="eCor">Correo</label><input id="eCor" type="email"></div><div><label for="eCel">Celular</label><input id="eCel" inputmode="tel"></div></div><button class="btn btn-a" style="margin-top:.6rem" onclick="anotarEspera('${c}')">Avisarme</button><p class="pequeno suave" style="margin-top:.6rem">¿Es especialista en ${c}? <a href="#/especialistas">Únase a la red</a>.</p></section>`;
+  if(!d.abierta) h+=`<section class="panel" style="border-left:5px solid var(--acento)"><h2 style="margin-top:0">Próximamente en ${c}</h2><p>Estamos reuniendo especialistas en ${c}. Le avisamos por correo el día que pueda activar el carnet de su familia aquí.</p><div class="r2">${campoNombre('eNom')}<div><label for="eCor">Correo</label><input id="eCor" type="email"></div><div><label for="eCel">Celular</label><input id="eCel" inputmode="tel"></div></div><button class="btn btn-a" style="margin-top:.6rem" onclick="anotarEspera('${c}')">Avisarme</button><p class="pequeno suave" style="margin-top:.6rem">¿Es especialista en ${c}? <a href="#/especialistas">Únase a la red</a>.</p></section>`;
   if(!fam) h+=`<p class="recordatorio pequeno">Ingrese con el carnet de su familia para ver tarifas, horarios y ser atendido. <a href="#/familia">Mi familia</a> · <a href="#/activar">Activar carnet</a></p>`;
   if(!ui.servicio){
     const mejor=sv=>{const xs=lista.filter(x=>x.servicio===sv);return xs.length?Math.min(...xs.map(x=>disponibilidad(x).r)):null};
@@ -369,7 +369,7 @@ async function pedirEsp(sv){if(!tok.get('familia')){soloAfiliados();return}
     <label for="pNota">Cuéntenos brevemente (opcional)</label><textarea id="pNota" rows="3" maxlength="300" placeholder="Ej. control de tiroides, lo antes posible, en la tarde"></textarea>
     <div class="fila" style="margin-top:.8rem"><button class="btn btn-a" onclick="enviarPedido()">Pedir este especialista</button><button class="btn btn-l" onclick="cerrarModal()">Volver</button></div>`)}
 function enviarPedido(){const sv=ui.pedirSv;accion(()=>api('/api/familia/pedir-especialista',{method:'POST',auth:'familia',body:{servicio:sv,miembro:document.getElementById('pMiembro').value,nota:document.getElementById('pNota').value}}).then(r=>{cerrarModal();return r}),'Listo. Vamos a buscar al especialista y le avisamos.')}
-function anotarEspera(c){const v=id=>document.getElementById(id).value;accion(()=>api('/api/publico/espera',{method:'POST',body:{ciudad:c,nombre:v('eNom'),correo:v('eCor'),celular:v('eCel')}}),'Listo. Le avisaremos cuando abramos en '+c+'.')}
+function anotarEspera(c){const v=id=>document.getElementById(id).value;accion(()=>api('/api/publico/espera',{method:'POST',body:{ciudad:c,nombre:nomDe('eNom'),correo:v('eCor'),celular:v('eCel')}}),'Listo. Le avisaremos cuando abramos en '+c+'.')}
 function filtrarCatalogo(t){t=t.trim().toLowerCase();document.querySelectorAll('.tile').forEach(e=>{e.style.display=!t||e.dataset.n.includes(t)?'':'none'});if(t)document.querySelectorAll('details').forEach(d=>d.open=true)}
 function vPrecios(c,lista){
   const svs=[...new Set(lista.filter(x=>!x.urgencias&&x.tarifa).map(x=>x.servicio))].sort(); if(!svs.length) return '';
@@ -417,28 +417,30 @@ function preguntar(c){accion(()=>api('/api/publico/pregunta',{method:'POST',body
 async function vActivar(){
   const a=CFG.ajustes,n=ui.nuevos.length,p=precioPlan(Math.max(n,1)),max=maxPersonas();
   return `<div class="rejilla" style="align-items:start"><section class="panel"><h2>Active el carnet de su familia</h2><p><strong>Hasta ${a.incluidos} personas por núcleo familiar.</strong></p><p class="suave">Se activa en el acto al aprobarse el pago. Vigencia de 12 meses.</p>
-    <label for="aTit">Nombre del titular</label><input id="aTit" autocomplete="name">
+    <div class="r2">${campoNombre('aTit','del titular')}</div>
     <div class="r2"><div><label for="aCor">Correo</label><input id="aCor" type="email" autocomplete="email"></div><div><label for="aTel">Celular (WhatsApp)</label><input id="aTel" inputmode="tel"></div></div>
     <label for="aCiu">Ciudad</label><select id="aCiu">${CFG.ciudades.map(c=>(CFG.ciudadesAbiertas||[]).includes(c)?`<option>${c}</option>`:`<option disabled>${c} (próximamente)</option>`).join('')}</select>
     <h3 style="margin-top:1rem">Personas en el carnet (${n} de ${max})</h3>
     ${n?`<ul class="lista">${ui.nuevos.map((m,i)=>`<li><span>${esc(m.nombre)} · ${esc(m.parentesco)} · ${esc(m.doc)}${i>=a.incluidos?' <span class="etq etq-av">adicional</span>':''}</span><button class="btn btn-l btn-chico" onclick="quitarBenef(${i})">Quitar</button></li>`).join('')}</ul>`:'<p class="suave pequeno">Agregue primero al titular y luego a cada familiar.</p>'}
-    ${n<max?`<div class="r2"><div><label for="bNom">Nombre completo</label><input id="bNom"></div><div><label for="bDoc">Documento</label><input id="bDoc" inputmode="numeric"></div><div><label for="bPar">Parentesco</label><select id="bPar">${['Titular','Cónyuge','Hijo(a)','Padre','Madre','Hermano(a)','Abuelo(a)','Nieto(a)','Suegro(a)','Otro'].map(x=>`<option>${x}</option>`).join('')}</select></div></div><button class="btn btn-l" style="margin-top:.6rem" onclick="agregarBenef()">Agregar persona</button>`:`<p class="recordatorio pequeno">Llegó al máximo de ${max} personas por carnet. Para más familiares, active un segundo grupo familiar con otro titular.</p>`}</section>
+    ${n<max?`<div class="r2">${campoNombre('bNom')}<div><label for="bDoc">Documento</label><input id="bDoc" inputmode="numeric"></div><div><label for="bPar">Parentesco</label><select id="bPar">${['Titular','Cónyuge','Hijo(a)','Padre','Madre','Hermano(a)','Abuelo(a)','Nieto(a)','Suegro(a)','Otro'].map(x=>`<option>${x}</option>`).join('')}</select></div></div><button class="btn btn-l" style="margin-top:.6rem" onclick="agregarBenef()">Agregar persona</button>`:`<p class="recordatorio pequeno">Llegó al máximo de ${max} personas por carnet. Para más familiares, active un segundo grupo familiar con otro titular.</p>`}</section>
   <div><section class="panel"><h3>Lo que recibe su familia</h3><ul class="lista pequeno">${['Atención rápida, sin esperar meses a la EPS','Si su especialidad aún no está, se la conseguimos','Precio preferencial en cada consulta','Carnet digital para cada persona','Sin autorizaciones de EPS','Pago protegido hasta ser atendido','Especialistas verificados en el ReTHUS'].map(x=>`<li><span>✓ ${x}</span></li>`).join('')}</ul></section>
   <section class="panel"><h3>Resumen</h3><ul class="lista pequeno"><li><span>Afiliación anual hasta ${a.incluidos} personas</span><span>${dinero(a.precioRegular)}</span></li>${p.extra?`<li><span>${Math.max(0,n-a.incluidos)} persona(s) adicional(es)</span><span>${dinero(p.extra)}</span></li>`:''}<li><span>Descuento por activación en línea</span><span style="color:var(--wa);font-weight:700">−${dinero(p.ahorro)}</span></li></ul>
     <div class="precio-gr" style="margin:.5rem 0">${dinero(p.enLinea)}</div><div class="pequeno suave">Un solo pago por 12 meses. Las consultas se pagan aparte, solo cuando las use.</div>
     <label style="display:flex;gap:.5rem;align-items:flex-start;font-weight:500;margin-top:1rem"><input type="checkbox" id="aAcep"> <span>Acepto los <a href="#/terminos" target="_blank">términos y condiciones</a> y autorizo de forma expresa el <a href="#/terminos" target="_blank">tratamiento de los datos personales</a> míos y de los integrantes de mi familia, incluidos los datos de salud y de menores de edad, para los fines allí descritos. Declaro que soy mayor de edad.</span></label>
     <button class="btn btn-a" style="width:100%;margin-top:.8rem" onclick="activar()">Pagar y activar el carnet</button><p class="legal" style="margin-top:.7rem">${LEGAL}</p></section></div></div>`;
 }
-const camposAct=['aTit','aCor','aTel','aCiu'];
+function campoNombre(id,quien){return `<div><label for="${id}N">${quien?'Nombres '+quien:'Nombres'}</label><input id="${id}N" autocomplete="given-name" placeholder="Ej. Carlos Ricardo"></div><div><label for="${id}A">${quien?'Apellidos '+quien:'Apellidos'}</label><input id="${id}A" autocomplete="family-name" placeholder="Ej. Londoño González"></div>`}
+function nomDe(id){const n=(document.getElementById(id+'N')?.value||'').trim().replace(/\s+/g,' '),a=(document.getElementById(id+'A')?.value||'').trim().replace(/\s+/g,' ');return n&&a?n+' '+a:''}
+const camposAct=['aTitN','aTitA','aCor','aTel','aCiu'];
 const leerCampos=()=>camposAct.reduce((o,id)=>{const e=document.getElementById(id);if(e)o[id]=e.value;return o},{});
 const ponerCampos=d=>Object.entries(d).forEach(([id,v])=>{const e=document.getElementById(id);if(e)e.value=v});
-async function agregarBenef(){const nombre=document.getElementById('bNom').value.trim(),doc=document.getElementById('bDoc').value.trim(),parentesco=document.getElementById('bPar').value;
-  if(!nombre||!doc){toast('Escriba el nombre y el documento.');return} if(ui.nuevos.some(m=>m.doc===doc)){toast('Esa persona ya está en el carnet.');return}
+async function agregarBenef(){const nombre=nomDe('bNom'),doc=document.getElementById('bDoc').value.trim(),parentesco=document.getElementById('bPar').value;
+  if(!nombre||!doc){toast('Escriba nombres, apellidos y documento.');return} if(ui.nuevos.some(m=>m.doc===doc)){toast('Esa persona ya está en el carnet.');return}
   const d=leerCampos(),ac=document.getElementById('aAcep')?.checked;ui.nuevos.push({nombre,doc,parentesco});await render();ponerCampos(d);if(ac)document.getElementById('aAcep').checked=true;
   if(ui.nuevos.length===CFG.ajustes.incluidos+1)toast(`Desde la persona ${CFG.ajustes.incluidos+1} se suma ${dinero(CFG.ajustes.adicional)} por cada una.`)}
 async function quitarBenef(i){const d=leerCampos(),ac=document.getElementById('aAcep')?.checked;ui.nuevos.splice(i,1);await render();ponerCampos(d);if(ac)document.getElementById('aAcep').checked=true}
-async function activar(){const d=leerCampos();if(!document.getElementById('aAcep').checked){toast('Acepte los términos y el tratamiento de datos para continuar.');return}
-  try{const o=await api('/api/familias/activar',{method:'POST',body:{titular:d.aTit,correo:d.aCor,telefono:d.aTel,ciudad:d.aCiu,miembros:ui.nuevos,acepto:true}});iniciarPago(o)}catch(e){toast(e.message)}}
+async function activar(){const d=leerCampos();if(!nomDe('aTit')){toast('Escriba los nombres y los apellidos del titular.');return}if(!document.getElementById('aAcep').checked){toast('Acepte los términos y el tratamiento de datos para continuar.');return}
+  try{const o=await api('/api/familias/activar',{method:'POST',body:{titular:nomDe('aTit'),correo:d.aCor,telefono:d.aTel,ciudad:d.aCiu,miembros:ui.nuevos,acepto:true}});iniciarPago(o)}catch(e){toast(e.message)}}
 
 /* ---------- Mi familia ---------- */
 async function vFamilia(){
@@ -503,9 +505,9 @@ function vGrupo(y){
   const max=CFG.ajustes.incluidos+CFG.ajustes.maxAdicionales, quedan=y.cambiosMax-y.cambiosUsados;
   return `<section class="panel"><h3>Grupo familiar</h3><p class="pequeno suave">Hasta ${max} personas. Puede hacer ${y.cambiosMax} cambios al año (agregar o retirar); le quedan <strong>${quedan}</strong>. Cada persona puede estar en un solo carnet.</p>
     <ul class="lista">${y.miembros.map((m,i)=>`<li><div><strong>${esc(m.nombre)}</strong> · ${esc(m.parentesco)}<br><span class="pequeno suave">Documento ${esc(m.doc)} · carnet ${esc(m.carnet)}</span></div>${i>0&&quedan>0?`<button class="btn btn-l btn-chico" onclick="quitarMiembro(${i})">Retirar</button>`:''}</li>`).join('')}</ul>
-    ${y.miembros.length<max&&quedan>0?`<h3 style="margin-top:1rem">Agregar una persona</h3><div class="r2"><div><label for="gNom">Nombre completo</label><input id="gNom"></div><div><label for="gDoc">Documento</label><input id="gDoc"></div><div><label for="gPar">Parentesco</label><select id="gPar">${['Cónyuge','Hijo(a)','Padre','Madre','Hermano(a)','Abuelo(a)','Nieto(a)','Suegro(a)','Otro'].map(x=>`<option>${x}</option>`).join('')}</select></div></div><button class="btn btn-a" style="margin-top:.6rem" onclick="agregarMiembro()">Agregar al carnet</button>`:''}</section>`;
+    ${y.miembros.length<max&&quedan>0?`<h3 style="margin-top:1rem">Agregar una persona</h3><div class="r2">${campoNombre('gNom')}<div><label for="gDoc">Documento</label><input id="gDoc"></div><div><label for="gPar">Parentesco</label><select id="gPar">${['Cónyuge','Hijo(a)','Padre','Madre','Hermano(a)','Abuelo(a)','Nieto(a)','Suegro(a)','Otro'].map(x=>`<option>${x}</option>`).join('')}</select></div></div><button class="btn btn-a" style="margin-top:.6rem" onclick="agregarMiembro()">Agregar al carnet</button>`:''}</section>`;
 }
-function agregarMiembro(){const v=id=>document.getElementById(id).value.trim();accion(()=>api('/api/familia/miembro',{method:'POST',auth:'familia',body:{accion:'agregar',nombre:v('gNom'),doc:v('gDoc'),parentesco:v('gPar')}}),'Persona agregada. Ya tiene su carnet.')}
+function agregarMiembro(){const v=id=>document.getElementById(id).value.trim();accion(()=>api('/api/familia/miembro',{method:'POST',auth:'familia',body:{accion:'agregar',nombre:nomDe('gNom'),doc:v('gDoc'),parentesco:v('gPar')}}),'Persona agregada. Ya tiene su carnet.')}
 function quitarMiembro(i){if(!confirm('¿Retirar a esta persona del carnet? Cuenta como uno de los cambios del año.'))return;accion(()=>api('/api/familia/miembro',{method:'POST',auth:'familia',body:{accion:'quitar',i}}),'Persona retirada del carnet.')}
 async function reprogramar(id){
   const c=ui.fam.citas.find(x=>x.id===id);
@@ -558,7 +560,7 @@ async function vEspecialistas(){
   <section class="recordatorio" id="ofertaFund"></section>
   ${inv?'':`<div class="rejilla" id="acceso" style="align-items:start">
     <section class="panel"><h2>1. Solicite acceso</h2><p class="suave">La red es solo por invitación. Revisamos su solicitud y le enviamos un código de acceso a su correo.</p>
-      <label for="sNom">Nombre completo</label><input id="sNom">
+      <div class="r2">${campoNombre('sNom')}</div>
       <label for="sEsp">Especialidad</label><select id="sEsp"><option value="">Elija…</option>${CFG.catalogo.map(g=>`<optgroup label="${esc(g.g)}">${g.e.map(x=>`<option>${esc(x)}</option>`).join('')}</optgroup>`).join('')}</select>
       <div class="r2"><div><label for="sCiu">Ciudad</label><select id="sCiu">${CFG.ciudades.map(c=>`<option>${c}</option>`).join('')}</select></div><div><label for="sRet">Número de ReTHUS</label><input id="sRet"></div></div>
       <div class="r2"><div><label for="sCor">Correo</label><input id="sCor" type="email"></div><div><label for="sCel">Celular (WhatsApp)</label><input id="sCel" inputmode="tel"></div></div>
@@ -572,7 +574,7 @@ async function vEspecialistas(){
     <p>Lo que pedimos es su <strong>registro profesional (ReTHUS)</strong> con la copia del mismo y una foto suya sosteniendo su cédula. Una persona de nuestro equipo confirma en el ReTHUS que su nombre, su cédula y su especialidad coinciden, y su servicio se habilita apenas se confirme.</p>
     <div class="r2">
       <div><label for="rRet">Número de registro profesional (ReTHUS)</label><input id="rRet" value="${esc(inv.rethus)}" readonly></div>
-      <div><label for="rNom">Nombre completo</label><input id="rNom" value="${esc(inv.nombre)}" readonly></div>
+      <div><label for="rNom">Nombres y apellidos</label><input id="rNom" value="${esc(inv.nombre)}" readonly></div>
       <div><label for="rCed">Cédula</label><input id="rCed" inputmode="numeric"></div>
       <div><label for="rEsp">Especialidad</label><input id="rEsp" value="${esc(inv.servicio)}" readonly></div>
       <div><label for="rCiu">Ciudad</label><input id="rCiu" value="${esc(inv.ciudad)}" readonly></div>
@@ -595,7 +597,8 @@ async function vEspecialistas(){
 }
 async function solicitarAcceso(){
   const v=id=>document.getElementById(id).value.trim();
-  try{await api('/api/medicos/solicitud',{method:'POST',body:{nombre:v('sNom'),servicio:v('sEsp'),ciudad:v('sCiu'),rethus:v('sRet'),correo:v('sCor'),celular:v('sCel')}});
+  if(!nomDe('sNom')){toast('Escriba sus nombres y sus apellidos, cada uno en su casilla.');return}
+  try{await api('/api/medicos/solicitud',{method:'POST',body:{nombre:nomDe('sNom'),servicio:v('sEsp'),ciudad:v('sCiu'),rethus:v('sRet'),correo:v('sCor'),celular:v('sCel')}});
     modal(`<h3>Solicitud recibida</h3><p>Gracias. Revisaremos sus datos y le enviaremos un código de acceso a su correo.</p><button class="btn btn-p" onclick="cerrarModal();render()">Entendido</button>`)}catch(e){toast(e.message)}
 }
 async function usarCodigo(){
