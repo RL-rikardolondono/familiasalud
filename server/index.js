@@ -820,6 +820,15 @@ app.post('/api/medico/bloqueo', requiere('medico'), h(async (req, res) => {
 app.post('/api/medico/bloqueo-quitar', requiere('medico'), h(async (req, res) => {
   await q('DELETE FROM bloqueos WHERE id=$1 AND lower(correo)=$2', [req.body.id, req.s.ref]); res.json({ ok: true });
 }));
+app.post('/api/medico/cuenta-pago', requiere('medico'), h(async (req, res) => {
+  const ps = await cuenta(req), banco = limpio(req.body.banco, 120);
+  if (banco.length < 8) throw new Fallo('Escriba cómo quiere recibir sus pagos.');
+  if (ps[0].demo) throw new Fallo('En la demostración no se cambian datos de pago.');
+  await q(`UPDATE prestadores SET banco=$1 WHERE id=ANY($2)`, [banco, ps.map(p => p.id)]);
+  correo(ps[0].correo, 'Cambió el medio donde recibe sus pagos · FamilIA Salud', `<p>Se cambió el medio donde recibe sus pagos a: <b>${hx(ocultar(banco))}</b>.</p><p>Si usted no hizo este cambio, escríbanos de inmediato a contacto@skynetgenesis.com o al WhatsApp 3044375758.</p>`);
+  if (E.ADMIN_CORREO) correo(E.ADMIN_CORREO, 'Un especialista cambió su medio de pago', `<p>${hx(ps[0].nombre)} cambió su medio de pago. Revíselo antes del siguiente retiro en <a href="${FRONT}/#/admin">Administración</a>.</p>`);
+  res.json({ ok: true });
+}));
 app.post('/api/medico/retiro', requiere('medico'), h(async (req, res) => {
   const ps = await cuenta(req), ids = ps.map(p => p.id);
   if (ps[0].demo) throw new Fallo('En la demostración no se hacen retiros de dinero.');
@@ -1078,7 +1087,7 @@ CREATE TABLE IF NOT EXISTS pagos_extra (pago_id text PRIMARY KEY, orden text, va
 CREATE TABLE IF NOT EXISTS enlaces (token text PRIMARY KEY, correo text, tipo text, expira timestamptz, usado boolean DEFAULT false);
 CREATE TABLE IF NOT EXISTS sesiones (token text PRIMARY KEY, tipo text, ref text, rol text, expira timestamptz);
 `;
-const AJUSTES_INICIALES = { ciudadesAbiertas: ['Santa Marta'], inasistencia: 50, diasRetiro: 8, precioRegular: 495000, precioEnLinea: 98000, incluidos: 7, adicional: 30000, maxAdicionales: 0, comision: 18, cuotaMedico: 380000, cuotaFundador: 190000, cupoFundadores: 100 };
+const AJUSTES_INICIALES = { ciudadesAbiertas: ['Santa Marta'], inasistencia: 50, diasRetiro: 8, precioRegular: 495000, precioEnLinea: 98000, incluidos: 7, adicional: 30000, maxAdicionales: 0, comision: 18, cuotaMedico: 380000, cuotaFundador: 50000, cupoFundadores: 100 };
 async function iniciar() {
   HASH_FALSO = await hashClave(crypto.randomBytes(12).toString('hex'));
   await pool.query(ESQUEMA);
