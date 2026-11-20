@@ -699,7 +699,7 @@ app.post('/api/medicos/solicitud', h(async (req, res) => {
   res.json({ ok: true });
 }));
 app.post('/api/medicos/invitacion', h(async (req, res) => {
-  const s2 = await q1(`SELECT nombre,servicio,ciudad,rethus,correo,celular FROM solicitudes WHERE lower(correo)=$1 AND codigo=$2 AND estado='invitado'`, [limpio(req.body.correo, 120).toLowerCase(), limpio(req.body.codigo, 12).toUpperCase()]);
+  const s2 = await q1(`SELECT nombre,servicio,ciudad,rethus,correo,celular,cortesia FROM solicitudes WHERE lower(correo)=$1 AND codigo=$2 AND estado='invitado'`, [limpio(req.body.correo, 120).toLowerCase(), limpio(req.body.codigo, 12).toUpperCase()]);
   if (!s2) throw new Fallo('El correo o el código no son válidos. Revise el mensaje que le enviamos.');
   res.json(s2);
 }));
@@ -725,10 +725,10 @@ app.post('/api/medicos/registro', h(async (req, res) => {
   if (await q1(`SELECT 1 FROM prestadores WHERE lower(correo)=$1 AND estado<>'rechazado'`, [d.correo])) throw new Fallo('Ese correo ya está registrado. Ingrese al portal médico.');
   d.fundador = (await fundadoresEn(d.ciudad)) < a.cupoFundadores;
   d.solicitud = inv.id;
-  const cuota = d.fundador ? a.cuotaFundador : a.cuotaMedico;
+  const cuota = inv.cortesia ? 0 : (d.fundador ? a.cuotaFundador : a.cuotaMedico);
   if (req.body.acepto !== true) throw new Fallo('Debe aceptar las condiciones.');
   d.aceptacion = { version: '2026-11', fecha: new Date().toISOString(), ip: ipDe(req), nombre: d.nombre };
-  res.json(await crearOrden('registro_medico', cuota, d, { demo: DEMO && CORREOS_DEMO.includes(d.correo), fundador: d.fundador, desc: d.fundador ? (cuota === 0 ? 'Primer año gratis · Especialista Fundador' : 'Cuota primer año · Especialista Fundador') : 'Cuota anual de registro FamilIA Salud' }));
+  res.json(await crearOrden('registro_medico', cuota, d, { demo: DEMO && CORREOS_DEMO.includes(d.correo), fundador: d.fundador, desc: inv.cortesia ? 'Registro sin cuota (cortesía de SkyNet Genesis)' : d.fundador ? (cuota === 0 ? 'Primer año gratis · Especialista Fundador' : 'Cuota primer año · Especialista Fundador') : 'Cuota anual de registro FamilIA Salud' }));
 }));
 async function cuenta(req) {
   const ps = await q('SELECT * FROM prestadores WHERE lower(correo)=$1 AND estado<>$2 ORDER BY institucion, servicio', [req.s.ref, 'rechazado']);
@@ -877,7 +877,7 @@ app.get('/api/admin/datos', requiere('admin'), h(async (req, res) => {
   const out = { yo: req.s.ref, rol: req.s.rol, permisos: pm, ajustes: a, familias, pendientes, red,
     kpis: { familias: activas.length, personas: activas.reduce((s, f) => s + f.personas, 0), especialistas: red.filter(p => p.vigencia.k !== 'bloqueado').length } };
   if (pm.verificar) out.pedidosEsp = await q(`SELECT pe.id,pe.ciudad,pe.servicio,pe.miembro,pe.nota,pe.estado,to_char(pe.creado AT TIME ZONE 'America/Bogota','YYYY-MM-DD HH24:MI') fecha,f.titular,f.telefono,f.correo FROM pedidos_esp pe JOIN familias f ON f.id=pe.familia_id WHERE pe.demo=false ORDER BY (pe.estado IN ('nuevo','buscando')) DESC, pe.creado DESC LIMIT 200`);
-  if (pm.verificar) out.solicitudes = await q(`SELECT id,nombre,servicio,ciudad,rethus,correo,celular,estado,codigo,to_char(creado AT TIME ZONE 'America/Bogota','YYYY-MM-DD') fecha FROM solicitudes ORDER BY creado DESC LIMIT 200`);
+  if (pm.verificar) out.solicitudes = await q(`SELECT id,nombre,servicio,ciudad,rethus,correo,celular,estado,codigo,cortesia,to_char(creado AT TIME ZONE 'America/Bogota','YYYY-MM-DD') fecha FROM solicitudes WHERE NOT (lower(correo) = ANY($1)) ORDER BY creado DESC LIMIT 200`, [CORREOS_DEMO]);
   const fund = {}; ps.filter(p => p.fundador).forEach(p => fund[p.ciudad] = (fund[p.ciudad] || 0) + 1); out.fundadores = fund;
   if (pm.dinero) {
     const s = async (cond) => Number((await q1(`SELECT coalesce(sum(monto),0)::bigint s FROM pagos WHERE demo=false AND ${cond}`)).s);
@@ -912,6 +912,12 @@ app.post('/api/admin/invitar', requiere('admin'), h(async (req, res) => {
   if (!s2) throw new Fallo('Solicitud no encontrada.');
   correo(s2.correo, 'Su código de acceso a FamilIA Salud', `<h2>¡Bienvenido, ${hx(s2.nombre)}!</h2><p>Su solicitud fue aprobada. Para registrarse en la red ingrese a <a href="${FRONT}/#/especialistas">${FRONT}/#/especialistas</a>, toque "¿Ya tiene su código?" y escriba:</p><p>Correo: ${s2.correo}<br>Código: <b style="font-size:22px;letter-spacing:4px">${cod}</b></p>`);
   res.json({ ok: true, codigo: cod });
+}));
+app.post('/api/admin/solicitud-cortesia', requiere('admin'), h(async (req, res) => {
+  exige(req, 'aprobar');
+  const r = await q1(`UPDATE solicitudes SET cortesia=$2 WHERE id=$1 AND estado IN ('pendiente','invitado') RETURNING id`, [req.body.id, req.body.cortesia === true]);
+  if (!r) throw new Fallo('Esa solicitud ya no se puede cambiar.');
+  res.json({ ok: true });
 }));
 app.post('/api/admin/solicitud-rechazar', requiere('admin'), h(async (req, res) => {
   exige(req, 'verificar'); await q(`UPDATE solicitudes SET estado='rechazada' WHERE id=$1 AND estado='pendiente'`, [req.body.id]); res.json({ ok: true });
@@ -1083,6 +1089,7 @@ CREATE TABLE IF NOT EXISTS retiros (id text PRIMARY KEY, prestador_id text, mont
 CREATE TABLE IF NOT EXISTS resenas (id text PRIMARY KEY, prestador_id text, cita_id text UNIQUE, estrellas int, texto text, creado timestamptz DEFAULT now());
 CREATE TABLE IF NOT EXISTS preguntas (id text PRIMARY KEY, ciudad text, servicio text, texto text, respuesta text, creado timestamptz DEFAULT now(), respondida timestamptz);
 CREATE TABLE IF NOT EXISTS solicitudes (id text PRIMARY KEY, nombre text, servicio text, ciudad text, rethus text, correo text, celular text, estado text, codigo text, creado timestamptz DEFAULT now());
+ALTER TABLE solicitudes ADD COLUMN IF NOT EXISTS cortesia boolean DEFAULT false;
 CREATE TABLE IF NOT EXISTS cuentas (correo text, tipo text, hash text, intentos int DEFAULT 0, intentos2 int DEFAULT 0, bloqueo timestamptz, bloqueada boolean DEFAULT false, motivo text, ultimo timestamptz, creado timestamptz DEFAULT now(), PRIMARY KEY(correo, tipo));
 CREATE TABLE IF NOT EXISTS pagos_extra (pago_id text PRIMARY KEY, orden text, valor int, nota text, resuelto boolean DEFAULT false, creado timestamptz DEFAULT now());
 CREATE TABLE IF NOT EXISTS enlaces (token text PRIMARY KEY, correo text, tipo text, expira timestamptz, usado boolean DEFAULT false);
