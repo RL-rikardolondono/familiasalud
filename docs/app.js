@@ -588,8 +588,7 @@ async function vEspecialistas(){
       <div><label for="rHor">Horas de atención</label><input id="rHor" value="08:00, 09:00, 10:00, 15:00, 16:00"></div></div>
     <p class="pequeno" id="rNeto"></p><p class="pequeno suave">El ${a.comision}% del precio con descuento corresponde al cobro por servicios de la aplicación (agenda, cobro, pago seguro y pacientes nuevos).</p>
     <label>Días de atención</label><div class="fila">${[1,2,3,4,5,6,0].map(d=>`<label style="display:flex;gap:.3rem;align-items:center;font-weight:500;margin:0"><input type="checkbox" class="rDia" value="${d}" ${d>=1&&d<=5?'checked':''}>${DIAS[d]}</label>`).join('')}</div>
-    <p class="pequeno suave">La cuenta debe estar a nombre suyo. Contabilidad confirma que el titular coincide con su cédula antes del primer pago.</p>
-    <div class="r2"><div><label for="rBan">Banco</label><input id="rBan"></div><div><label for="rCta">Tipo y número de cuenta</label><input id="rCta"></div></div>
+    ${formCobro('r')}
     <p class="pequeno suave">El público solo ve su especialidad y si está disponible. Las familias afiliadas ven además su mensaje, sus precios y sus turnos. Su nombre y su dirección los ve únicamente el paciente que ya pagó. Sus datos personales y bancarios solo los ven la administración superior y contabilidad.</p>
     <label style="display:flex;gap:.5rem;align-items:flex-start;font-weight:500;margin-top:1rem"><input type="checkbox" id="rAcep"> <span id="txtAcep"></span></label>
     <button class="btn btn-a" style="margin-top:1rem" id="btnRegistro" onclick="registrarEspecialista()">Enviar registro</button></section>`:''}`;
@@ -610,18 +609,38 @@ function ofertaCiudad(){
   bt.textContent=cuota===0?'Enviar registro (primer año gratis)':`Pagar ${dinero(cuota)} y enviar registro`;
   ta.textContent=`${cuota===0?'Entiendo que mi primer año es gratis y que desde el segundo año la cuota es de '+dinero(a.cuotaMedico):'Acepto pagar la cuota del primer año de '+dinero(cuota)+' (desde el segundo año, '+dinero(a.cuotaMedico)+')'} y que FamilIA Salud recaude mis consultas y me transfiera el ${100-a.comision}% al registrar la atención. Acepto los términos y el tratamiento de mis datos personales.`;
 }
+const MEDIOS_COBRO={cuenta:'Cuenta bancaria',llave:'Llave Bre-B',nequi:'Nequi',daviplata:'Daviplata'};
+function formCobro(p){return `<label for="${p}Medio">¿Cómo quiere recibir sus pagos?</label>
+    <select id="${p}Medio" onchange="verCobro('${p}')">${Object.entries(MEDIOS_COBRO).map(([k,t])=>`<option value="${k}">${t}</option>`).join('')}</select>
+    <div id="${p}CobCta" class="r2"><div><label for="${p}Ban">Banco</label><input id="${p}Ban" list="bancosCo" placeholder="Ej. Bancolombia"></div>
+      <div><label for="${p}Tip">Tipo de cuenta</label><select id="${p}Tip"><option>Ahorros</option><option>Corriente</option></select></div>
+      <div><label for="${p}Num">Número de cuenta</label><input id="${p}Num" inputmode="numeric" maxlength="20"></div></div>
+    <div id="${p}CobLla" style="display:none"><label for="${p}Lla">Su llave Bre-B (celular, cédula, correo o llave alfanumérica)</label><input id="${p}Lla" maxlength="60"></div>
+    <div id="${p}CobCel" style="display:none"><label for="${p}Cel2">Número de celular de su cuenta</label><input id="${p}Cel2" inputmode="tel" maxlength="12"></div>
+    <datalist id="bancosCo">${['Bancolombia','Davivienda','Banco de Bogotá','BBVA','Banco de Occidente','Banco Popular','Banco AV Villas','Banco Caja Social','Scotiabank Colpatria','Banco Agrario','Itaú','Banco Falabella','Bancoomeva','Banco Pichincha','Banco W','Lulo Bank','Nu Colombia'].map(b=>`<option value="${b}">`).join('')}</datalist>
+    <p class="pequeno suave">La cuenta, la llave o el celular deben estar a nombre suyo. Contabilidad confirma que el titular coincide con su cédula antes del primer pago.</p>`}
+function verCobro(p){const m=document.getElementById(p+'Medio').value;document.getElementById(p+'CobCta').style.display=m==='cuenta'?'':'none';document.getElementById(p+'CobLla').style.display=m==='llave'?'':'none';document.getElementById(p+'CobCel').style.display=(m==='nequi'||m==='daviplata')?'':'none'}
+function leerCobro(p){const v=id=>(document.getElementById(p+id)?.value||'').trim(),m=v('Medio');
+  if(m==='cuenta'){const n=v('Num').replace(/[\s.-]/g,'');return v('Ban')&&/^\d{6,20}$/.test(n)?`${v('Ban')} · ${v('Tip')} · ${n}`:''}
+  if(m==='llave')return v('Lla').length>=4?`Llave Bre-B · ${v('Lla')}`:'';
+  const c=v('Cel2').replace(/\D/g,'');return /^3\d{9}$/.test(c)?`${MEDIOS_COBRO[m]} · ${c}`:''}
+function cambiarCobro(){modal(`<h3>Cambiar dónde recibe sus pagos</h3>${formCobro('k')}<p class="pequeno">Por su seguridad le enviaremos un aviso a su correo, y contabilidad revisa la nueva cuenta antes del siguiente pago.</p>
+  <div class="fila" style="margin-top:.8rem"><button class="btn btn-a" onclick="guardarCobro()">Guardar</button><button class="btn btn-l" onclick="cerrarModal()">Volver</button></div>`)}
+function guardarCobro(){const b=leerCobro('k');if(!b){toast('Revise los datos: banco y número de cuenta, la llave, o un celular de 10 dígitos.');return}
+  accion(()=>api('/api/medico/cuenta-pago',{method:'POST',auth:'medico',body:{banco:b}}).then(r=>{cerrarModal();return r}),'Listo. Sus pagos llegarán al nuevo medio.')}
 const leerArchivo=f=>new Promise((ok,mal)=>{const l=new FileReader();l.onload=()=>ok(l.result);l.onerror=()=>mal(new Error('No se pudo leer el archivo.'));l.readAsDataURL(f)});
 async function registrarEspecialista(){
   if(!ui.invitacion){toast('Necesita un código de invitación para registrarse.');return}
   const v=id=>document.getElementById(id).value.trim();
   const doc=document.getElementById('rDoc').files[0], self=document.getElementById('rSelf').files[0];
+  if(!leerCobro('r')){toast('Escriba cómo quiere recibir sus pagos: cuenta, llave Bre-B, Nequi o Daviplata.');return}
   if(!document.getElementById('rAcep').checked){toast('Debe aceptar las condiciones.');return}
   if(!doc||!self){toast('Adjunte la copia de su ReTHUS y la foto con su cédula.');return}
   if(doc.size>1.5*1024*1024||self.size>1.5*1024*1024){toast('Cada archivo debe pesar menos de 1,5 MB. Tome fotos más livianas.');return}
   try{
     const [docData,selfData]=await Promise.all([leerArchivo(doc),leerArchivo(self)]);
     const o=await api('/api/medicos/registro',{method:'POST',body:{rethus:v('rRet'),nombre:v('rNom'),cedula:v('rCed'),servicio:v('rEsp'),ciudad:v('rCiu'),sede:v('rSede'),correo:v('rCor'),celular:v('rCel'),reps:v('rReps'),mensaje:v('rMsg'),particular:Number(v('rPar')),tarifa:Number(v('rTar')),
-      horas:v('rHor').split(',').map(s=>s.trim()).filter(s=>/^\d{1,2}:\d{2}$/.test(s)).map(s=>s.padStart(5,'0')),dias:[...document.querySelectorAll('.rDia:checked')].map(e=>Number(e.value)),banco:`${v('rBan')} · ${v('rCta')}`,codigo:ui.invitacion.codigo,acepto:true,doc:docData,docTipo:doc.type,docNombre:doc.name,selfie:selfData}});
+      horas:v('rHor').split(',').map(s=>s.trim()).filter(s=>/^\d{1,2}:\d{2}$/.test(s)).map(s=>s.padStart(5,'0')),dias:[...document.querySelectorAll('.rDia:checked')].map(e=>Number(e.value)),banco:leerCobro('r'),codigo:ui.invitacion.codigo,acepto:true,doc:docData,docTipo:doc.type,docNombre:doc.name,selfie:selfData}});
     iniciarPago(o);
   }catch(e){toast(e.message)}
 }
@@ -658,7 +677,7 @@ async function vMedico(){
       <button class="btn btn-a" style="margin-top:.6rem" onclick="agregarBloqueo()">Bloquear esas fechas</button>
       <ul class="lista" style="margin-top:1rem">${y.bloqueos.map(b=>`<li><span>${fmt(b.desde)}${b.hasta!==b.desde?' al '+fmt(b.hasta):''}${b.motivo?' · '+esc(b.motivo):''}</span><button class="btn btn-l btn-chico" onclick="quitarBloqueo('${b.id}')">Quitar</button></li>`).join('')||'<li>No tiene fechas bloqueadas.</li>'}</ul></section>`;
   } else if(ui.vistaMed==='dinero'){
-    h+=`<section class="panel"><h3>Retirar a mi cuenta</h3><p class="pequeno suave">Cuenta registrada: ${esc(p.banco)}. Para cambiarla, escriba a contabilidad.</p>
+    h+=`<section class="panel"><h3>Retirar a mi cuenta</h3><p class="pequeno suave">Sus pagos llegan a: <strong>${esc(p.banco)}</strong>. <button class="btn btn-l btn-chico" onclick="cambiarCobro()">Cambiar</button></p>
       <button class="btn btn-a" ${s.disponible<=0?'disabled':''} onclick="pedirRetiro()">Retirar ${dinero(s.disponible)}</button>
       <h3 style="margin-top:1.2rem">Movimientos</h3><ul class="lista">${y.movimientos.map(x=>`<li><span>${fmt(x.fecha)} · ${x.nota?esc(x.nota)+' · servicios de la aplicación '+dinero(x.comision):`consulta ${dinero(x.monto)} − servicios de la aplicación ${dinero(x.comision)}`}</span><span class="etq ${x.estado==='liberado'?'etq-ok':x.estado==='retenido'?'etq-av':'etq-no'}">${x.estado==='liberado'?'Pagado '+dinero(x.neto):x.estado==='retenido'?'Reservado':'Devuelto a la familia'}</span></li>`).join('')}
       ${y.retiros.map(r=>`<li><span>${fmt(r.fecha)} · retiro a cuenta</span><span class="etq ${r.estado==='transferido'?'etq-ok':'etq-av'}">${r.estado==='transferido'?'Transferido':'En proceso'} ${dinero(r.monto)}</span></li>`).join('')}</ul></section>`;
