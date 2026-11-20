@@ -107,7 +107,8 @@ async function correo(para, asunto, html) {
 function planDe(tipo, monto, extra = {}) {
   if (tipo === 'consulta') return `${APP_BOLD}:paq_cien-x${Math.round(monto / 100)}`;
   if (tipo === 'prueba') return `${APP_BOLD}:prueba`;
-  if (tipo === 'registro_medico') return `${APP_BOLD}:${extra.fundador ? 'fund' : 'esp'}`;
+  // Fundador: el valor lo fija Administración (hoy $50.000), así que se cobra en unidades de $100 y no depende del firmador
+  if (tipo === 'registro_medico') return extra.fundador ? `${APP_BOLD}:paq_cien-x${Math.round(monto / 100)}` : `${APP_BOLD}:esp`;
   if (tipo === 'renovacion_medico') return `${APP_BOLD}:esp`;
   const ad = extra.adicionales || 0;   // afiliación o renovación familiar
   return ad > 0 ? `${APP_BOLD}:paq_afil_adic-x${ad}` : `${APP_BOLD}:afil`;
